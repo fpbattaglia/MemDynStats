@@ -1,9 +1,10 @@
 import numpy as np
-# import pandas as pd
+import pandas as pd
 
 from numba import njit
 from scipy.stats import ttest_ind_from_stats
-
+import concurrent.futures
+import itertools
 
 @njit
 def calc_mean_var_2groups(a, b):
@@ -39,11 +40,11 @@ def site_statistics_ttest_ind(df, col_groups, col_values):
     data = df[col_values].values
     groups = [data[df[col_groups] == l] for l in labels]
     tt_result = ttest_with_numba(*groups)
-    return tt_result.pvalue
+    return tt_result.statistic, tt_result.pvalue
 
 
-def find_max_clust_stat_1d(stat, threshold=0.05, cyclic=False):
-    active_sites = (stat < threshold).astype(np.int)
+def find_max_clust_stat_1d(stat, pval, threshold=0.05, cyclic=False):
+    active_sites = (pval < threshold).astype(np.int)
     dd = np.diff(active_sites)
     n_start = np.where(dd == 1)[0] + 1
 
@@ -65,14 +66,39 @@ def find_max_clust_stat_1d(stat, threshold=0.05, cyclic=False):
     return cluster_stats, clusters
 
 
-def cluster_statistic(df, col_groups, col_values, connectivity='1d', site_alpha=0.05):
-    stat = site_statistics_ttest_ind(df, col_groups, col_values)
+def cluster_statistic(df, col_groups, col_values, connectivity='1d', site_alpha=0.05,
+                      site_statistics=site_statistics_ttest_ind):
+    stat, pval = site_statistics(df, col_groups, col_values)
 
     if connectivity == '1d':
-        cluster_stats, clusters = find_max_clust_stat_1d(stat, site_alpha)
+        cluster_stats, clusters = find_max_clust_stat_1d(stat, pval, site_alpha)
     elif connectivity == '1dcyclic':
-        cluster_stats, clusters = find_max_clust_stat_1d(stat, site_alpha, cyclic=True)
+        cluster_stats, clusters = find_max_clust_stat_1d(stat, pval, site_alpha, cyclic=True)
     else:
         raise NotImplementedError("connectivity " + connectivity + " not implemented")
 
     return cluster_stats, clusters
+
+
+def monte_carlo_iteration(df, col_groups, col_values, connectivity, site_alpha, site_statistics):
+    df[col_groups] = np.random.permutation(df[col_groups])
+    cluster_stats, _ = cluster_statistic(df, col_groups, col_values, connectivity, site_alpha,
+                      site_statistics=site_statistics)
+    return cluster_stats[0]
+
+
+def run_monte_carlo(df, col_groups, col_values, connectivity, site_alpha, site_statistics, n_repetitions):
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        stats_mc = executor.map(lambda x: monte_carlo_iteration(*x),
+                                *[itertools.repeat(d, n_repetitions) for d in (df, col_groups, col_values, connectivity,
+                                                  site_alpha, site_statistics)],
+                                chunksize=100)
+    stats_mc = np.array(list(stats_mc))
+    stats_mc.sort()
+    stats_mc = stats_mc[::-1]
+    idx = np.linspace(0, 1, n_repetitions)
+    stats_mc = pd.Series(data=stats_mc, idx=idx)
+    return stats_mc
+
+
+
