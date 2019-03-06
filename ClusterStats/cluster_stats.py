@@ -1,10 +1,12 @@
-import numpy as np
-import pandas as pd
-
-from numba import njit
-from scipy.stats import ttest_ind_from_stats
 import concurrent.futures
 import itertools
+
+import cv2
+import numpy as np
+import pandas as pd
+from numba import njit
+from scipy.stats import ttest_ind_from_stats
+
 
 @njit
 def calc_mean_var_2groups(a, b):
@@ -43,7 +45,25 @@ def site_statistics_ttest_ind(df, col_groups, col_values):
     return tt_result.statistic, tt_result.pvalue
 
 
-def find_max_clust_stat_1d(stat, pval, threshold=0.05, cyclic=False):
+def clust_stats_opencv(stat, pval, threshold=0.05, cyclic = False):
+    active_sites = (pval < threshold).astype(np.int8)
+    ret, labels = cv2.connectedComponents(active_sites)
+    clusters = []
+    cluster_stats = []
+    for l in range(ret):
+        lab_l = (labels == l)
+        if not np.any(active_sites[lab_l] == 0):
+            lab_l_int = lab_l.astype(np.int32)
+            clusters.append(lab_l_int)
+            cluster_stats.append(np.sum(lab_l_int * stat))
+    cluster_stats = np.array(cluster_stats)
+    ix = np.argsort(cluster_stats)[::-1]
+    cluster_stats = cluster_stats[ix]
+    clusters = clusters[ix]
+    return cluster_stats, clusters
+
+
+def clust_stats_1d(stat, pval, threshold=0.05, cyclic=False):
     active_sites = (pval < threshold).astype(np.int)
     dd = np.diff(active_sites)
     n_start = np.where(dd == 1)[0] + 1
@@ -71,9 +91,9 @@ def cluster_statistic(df, col_groups, col_values, connectivity='1d', site_alpha=
     stat, pval = site_statistics(df, col_groups, col_values)
 
     if connectivity == '1d':
-        cluster_stats, clusters = find_max_clust_stat_1d(stat, pval, site_alpha)
+        cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha)
     elif connectivity == '1dcyclic':
-        cluster_stats, clusters = find_max_clust_stat_1d(stat, pval, site_alpha, cyclic=True)
+        cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha, cyclic=True)
     else:
         raise NotImplementedError("connectivity " + connectivity + " not implemented")
 
@@ -83,7 +103,7 @@ def cluster_statistic(df, col_groups, col_values, connectivity='1d', site_alpha=
 def monte_carlo_iteration(df, col_groups, col_values, connectivity, site_alpha, site_statistics):
     df[col_groups] = np.random.permutation(df[col_groups])
     cluster_stats, _ = cluster_statistic(df, col_groups, col_values, connectivity, site_alpha,
-                      site_statistics=site_statistics)
+                                         site_statistics=site_statistics)
     return cluster_stats[0]
 
 
@@ -91,14 +111,11 @@ def run_monte_carlo(df, col_groups, col_values, connectivity, site_alpha, site_s
     with concurrent.futures.ProcessPoolExecutor() as executor:
         stats_mc = executor.map(lambda x: monte_carlo_iteration(*x),
                                 *[itertools.repeat(d, n_repetitions) for d in (df, col_groups, col_values, connectivity,
-                                                  site_alpha, site_statistics)],
+                                                                               site_alpha, site_statistics)],
                                 chunksize=100)
     stats_mc = np.array(list(stats_mc))
     stats_mc.sort()
     stats_mc = stats_mc[::-1]
     idx = np.linspace(0, 1, n_repetitions)
-    stats_mc = pd.Series(data=stats_mc, idx=idx)
+    stats_mc = pd.Series(data=stats_mc, index=idx)
     return stats_mc
-
-
-
