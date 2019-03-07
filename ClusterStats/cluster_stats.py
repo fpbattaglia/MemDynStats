@@ -28,15 +28,15 @@ def ttest_with_numba(a, b):
     return ttest_ind_from_stats(m1, s1, a.shape[0], m2, s2, b.shape[0])
 
 
-def site_statistics_ttest_ind(data, labels, unique_labels):
+def site_statistics_ttest_ind(data_test, labels_here, unique_labels_here):
     """
 
-    :param data:
-    :param labels:
+    :param data_test:
+    :param labels_here:
     :return:
     """
 
-    groups = [(data[labels == l, :]).astype(np.float) for l in unique_labels]
+    groups = [(data_test[labels_here == l, :]).astype(np.float) for l in unique_labels_here]
     tt_result = ttest_with_numba(*groups)
     return tt_result.statistic, tt_result.pvalue
 
@@ -51,13 +51,13 @@ def clust_stats_opencv(stat, pval, threshold=0.05, cyclic=False):
         is_1_D = False
         if cyclic:
             raise ValueError('Cyclic can only be specified for 1D statistics')
-    ret, labels = cv2.connectedComponents(active_sites)
+    ret, components = cv2.connectedComponents(active_sites)
     if is_1_D:
-        labels = np.reshape(labels, (len(labels),))
+        components = np.reshape(components, (len(components),))
     clusters = []
     cluster_stats = []
     for l in range(ret):
-        lab_l = (labels == l)
+        lab_l = (components == l)
         if not np.any(active_sites[lab_l] == 0):
             lab_l_int = lab_l.astype(np.int32)
             clusters.append(lab_l_int)
@@ -97,7 +97,7 @@ def cluster_statistic(data, labels, unique_labels, connectivity='1d', site_alpha
     stat, pval = site_statistics(data, labels, unique_labels)
 
     if connectivity == '1d':
-        cluster_stats, clusters = clust_stats_opencv(stat, pval, site_alpha)
+        cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha)
     elif connectivity == '1dcyclic':
         cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha, cyclic=True)
     else:
@@ -112,12 +112,17 @@ def get_random_seed():
     return seed
 
 
-def monte_carlo_iteration(data, labels, unique_labels, connectivity='1d', site_alpha=0.05,
+data = None
+labels = None
+unique_labels = None
+
+
+def monte_carlo_iteration(connectivity='1d', site_alpha=0.05,
                           site_statistics=site_statistics_ttest_ind):
     np.random.seed(get_random_seed())
     try:
-        labels = np.random.permutation(labels)
-        cluster_stats, _ = cluster_statistic(data, labels, unique_labels, connectivity, site_alpha,
+        labels_here = np.random.permutation(labels.copy())
+        cluster_stats, _ = cluster_statistic(data, labels_here, unique_labels, connectivity, site_alpha,
                                              site_statistics=site_statistics)
         if len(cluster_stats) == 0:
             return 0
@@ -128,13 +133,16 @@ def monte_carlo_iteration(data, labels, unique_labels, connectivity='1d', site_a
 
 def run_monte_carlo(df, col_groups, col_values, n_repetitions, connectivity='1d', site_alpha=0.05,
                     site_statistics=site_statistics_ttest_ind):
+    global data
+    global labels
+    global unique_labels
+
     data = df[col_values].values
     labels = df[col_groups].values
     unique_labels = np.unique(labels).astype(np.int)[::-1]
     with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
         stats_mc = executor.map(monte_carlo_iteration,
-                                *[itertools.repeat(d, n_repetitions) for d in (data, labels, unique_labels,
-                                                                               connectivity,
+                                *[itertools.repeat(d, n_repetitions) for d in (connectivity,
                                                                                site_alpha, site_statistics)],
                                 chunksize=100)
     # concurrent.futures.wait(stats_mc)
