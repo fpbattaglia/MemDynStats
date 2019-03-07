@@ -22,32 +22,38 @@ def calc_mean_var_2groups(a, b):
 
 
 def ttest_with_numba(a, b):
+    # print(a)
+    # print(b)
     (m1, m2, s1, s2) = calc_mean_var_2groups(a, b)
     return ttest_ind_from_stats(m1, s1, a.shape[0], m2, s2, b.shape[0])
 
 
-def site_statistics_ttest_ind(df, col_groups, col_values):
+def site_statistics_ttest_ind(data, labels, unique_labels):
     """
 
-    :param df:
-    :param col_groups:
-    :param col_values:
+    :param data:
+    :param labels:
     :return:
     """
 
-    if df[col_groups].n_unique() != 2:
-        raise ValueError(col_groups + ' must be a binary column (2 groups)')
-
-    labels = df[col_groups].unique()
-    data = df[col_values].values
-    groups = [data[df[col_groups] == l] for l in labels]
+    groups = [(data[labels == l, :]).astype(np.float) for l in unique_labels]
     tt_result = ttest_with_numba(*groups)
     return tt_result.statistic, tt_result.pvalue
 
 
-def clust_stats_opencv(stat, pval, threshold=0.05, cyclic = False):
+def clust_stats_opencv(stat, pval, threshold=0.05, cyclic=False):
     active_sites = (pval < threshold).astype(np.int8)
+    if active_sites.ndim == 1:
+        is_1_D = True
+        if cyclic:
+            raise NotImplementedError("Cyclic not implemented")  # TODO
+    else:
+        is_1_D = False
+        if cyclic:
+            raise ValueError('Cyclic can only be specified for 1D statistics')
     ret, labels = cv2.connectedComponents(active_sites)
+    if is_1_D:
+        labels = np.reshape(labels, (len(labels),))
     clusters = []
     cluster_stats = []
     for l in range(ret):
@@ -59,7 +65,7 @@ def clust_stats_opencv(stat, pval, threshold=0.05, cyclic = False):
     cluster_stats = np.array(cluster_stats)
     ix = np.argsort(cluster_stats)[::-1]
     cluster_stats = cluster_stats[ix]
-    clusters = clusters[ix]
+    clusters = [clusters[i] for i in ix]
     return cluster_stats, clusters
 
 
@@ -79,19 +85,19 @@ def clust_stats_1d(stat, pval, threshold=0.05, cyclic=False):
         clusters[0] = np.r_[clusters[0], clusters[-1]]
         del clusters[-1]
 
-    cluster_stats = [np.sum(stat[clusters[i]]) for i in range(len(clusters))]
+    cluster_stats = np.array([np.sum(stat[clusters[i]]) for i in range(len(clusters))])
     ix = np.argsort(cluster_stats)[::-1]
     cluster_stats = cluster_stats[ix]
-    clusters = clusters[ix]
+    clusters = [clusters[i] for i in ix]
     return cluster_stats, clusters
 
 
-def cluster_statistic(df, col_groups, col_values, connectivity='1d', site_alpha=0.05,
+def cluster_statistic(data, labels, unique_labels, connectivity='1d', site_alpha=0.05,
                       site_statistics=site_statistics_ttest_ind):
-    stat, pval = site_statistics(df, col_groups, col_values)
+    stat, pval = site_statistics(data, labels, unique_labels)
 
     if connectivity == '1d':
-        cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha)
+        cluster_stats, clusters = clust_stats_opencv(stat, pval, site_alpha)
     elif connectivity == '1dcyclic':
         cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha, cyclic=True)
     else:
@@ -100,22 +106,45 @@ def cluster_statistic(df, col_groups, col_values, connectivity='1d', site_alpha=
     return cluster_stats, clusters
 
 
-def monte_carlo_iteration(df, col_groups, col_values, connectivity, site_alpha, site_statistics):
-    df[col_groups] = np.random.permutation(df[col_groups])
-    cluster_stats, _ = cluster_statistic(df, col_groups, col_values, connectivity, site_alpha,
-                                         site_statistics=site_statistics)
-    return cluster_stats[0]
+def get_random_seed():
+    rf = open('/dev/random', 'rb')
+    seed = int.from_bytes(rf.read(4), 'big')
+    return seed
 
 
-def run_monte_carlo(df, col_groups, col_values, connectivity, site_alpha, site_statistics, n_repetitions):
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        stats_mc = executor.map(lambda x: monte_carlo_iteration(*x),
-                                *[itertools.repeat(d, n_repetitions) for d in (df, col_groups, col_values, connectivity,
+def monte_carlo_iteration(data, labels, unique_labels, connectivity='1d', site_alpha=0.05,
+                          site_statistics=site_statistics_ttest_ind):
+    np.random.seed(get_random_seed())
+    try:
+        labels = np.random.permutation(labels)
+        cluster_stats, _ = cluster_statistic(data, labels, unique_labels, connectivity, site_alpha,
+                                             site_statistics=site_statistics)
+        if len(cluster_stats) == 0:
+            return 0
+        return cluster_stats[0]
+    except BaseException:
+        return np.nan
+
+
+def run_monte_carlo(df, col_groups, col_values, n_repetitions, connectivity='1d', site_alpha=0.05,
+                    site_statistics=site_statistics_ttest_ind):
+    data = df[col_values].values
+    labels = df[col_groups].values
+    unique_labels = np.unique(labels).astype(np.int)[::-1]
+    with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+        stats_mc = executor.map(monte_carlo_iteration,
+                                *[itertools.repeat(d, n_repetitions) for d in (data, labels, unique_labels,
+                                                                               connectivity,
                                                                                site_alpha, site_statistics)],
                                 chunksize=100)
+    # concurrent.futures.wait(stats_mc)
     stats_mc = np.array(list(stats_mc))
     stats_mc.sort()
     stats_mc = stats_mc[::-1]
     idx = np.linspace(0, 1, n_repetitions)
     stats_mc = pd.Series(data=stats_mc, index=idx)
     return stats_mc
+
+
+if __name__ == '__main__':
+    pass
