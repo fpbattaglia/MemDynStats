@@ -112,3 +112,5 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+/jupyter/trials.h5
+/jupyter/Untitled.ipynb
