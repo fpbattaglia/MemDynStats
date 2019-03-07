@@ -33,9 +33,9 @@ def site_statistics_ttest_ind(data_test, labels_here, unique_labels_here):
 
     :param data_test:
     :param labels_here:
+    :param unique_labels_here:
     :return:
     """
-
     groups = [(data_test[labels_here == l, :]).astype(np.float) for l in unique_labels_here]
     tt_result = ttest_with_numba(*groups)
     return tt_result.statistic, tt_result.pvalue
@@ -92,9 +92,9 @@ def clust_stats_1d(stat, pval, threshold=0.05, cyclic=False):
     return cluster_stats, clusters
 
 
-def cluster_statistic(data, labels, unique_labels, connectivity='1d', site_alpha=0.05,
+def cluster_statistic(data_here, labels_here, unique_labels_here, connectivity='1d', site_alpha=0.05,
                       site_statistics=site_statistics_ttest_ind):
-    stat, pval = site_statistics(data, labels, unique_labels)
+    stat, pval = site_statistics(data_here, labels_here, unique_labels_here)
 
     if connectivity == '1d':
         cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha)
@@ -117,6 +117,7 @@ labels = None
 unique_labels = None
 
 
+# noinspection PyBroadException
 def monte_carlo_iteration(connectivity='1d', site_alpha=0.05,
                           site_statistics=site_statistics_ttest_ind):
     np.random.seed(get_random_seed())
