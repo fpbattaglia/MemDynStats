@@ -93,7 +93,7 @@ def clust_stats_opencv(stat, pval, threshold=0.05, cyclic=False):
     :param stat: the t-statistics per data point
     :param pval: the pvalue per data point
     :param threshold: the site-based threshold
-    :param cyclic: if True, the array is considered cyclic (not imlpemented yet)
+    :param cyclic: if True, the array is considered cyclic (not implemented yet)
     :return: cluster_stats: the cluster statistics, clusters: the clusters
     """
     active_sites = (pval < threshold).astype(np.int8)
@@ -130,7 +130,7 @@ def clust_stats_1d(stat, pval, threshold=0.05, cyclic=False):
     :param stat: the t-statistics per data point
     :param pval: the pvalue per data point
     :param threshold: the site-based threshold
-    :param cyclic: if True, the array is considered cyclic (not imlpemented yet)
+    :param cyclic: if True, the array is considered cyclic (not implemented yet)
     :return: cluster_stats: the cluster statistics, clusters: the clusters (as slices)
     """
     active_sites = (pval < threshold).astype(np.int)

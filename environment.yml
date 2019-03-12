@@ -1,0 +1,10 @@
+name: memdynstats
+
+dependencies:
+  - opencv
+  - numba
+  - pandas
+  - numpy
+  - matplotlib
+  - scipy
+  - notebook
