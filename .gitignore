@@ -114,3 +114,4 @@ venv.bak/
 
 /jupyter/trials.h5
 /jupyter/Untitled.ipynb
+/jupyter/*.csv
