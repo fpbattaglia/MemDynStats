@@ -12,6 +12,7 @@ from scipy.stats import ttest_ind_from_stats
 def calc_mean_var_2groups(a, b):
     """
     Computes the means and standard deviations for two groups
+
     :param a: a first group ( (Ndata,) or (Ndata, N_columns)
     :param b: a first group ( (Ndata,) or (Ndata, N_columns)
     :return: m1, m2, s1, s2 (the means and standard deviations)
@@ -32,6 +33,7 @@ def calc_mean_var_multi_group(data_here, bins_here, labels_here, unique_labels_h
     """
     Computes the means and standard deviations for two groups, where the column index (bin) each data belongs to
     is specified in a vector
+
     :param data_here: the data (as a vector)
     :param bins_here: a vector including the column for each data point
     :param labels_here: a vector indicating the group for each data point
@@ -61,6 +63,7 @@ def site_statistics_ttest_ind_multi_group(data_here, labels_here, unique_labels_
     """
     performs an optimized t-test for independent samples where the column index (bin) each data belongs to
     is specified in a vector
+
     :param data_here: the data (as a vector)
     :param labels_here: a vector indicating the group for each data point
     :param unique_labels_here: the group labels (there must be two of them)
@@ -75,6 +78,7 @@ def site_statistics_ttest_ind_multi_group(data_here, labels_here, unique_labels_
 def site_statistics_ttest_ind(data_here, labels_here, unique_labels_here, bins_here=None):
     """
     performs an optimized t-test for independent samples for data in the form (Ndata X Ncolumns)
+
     :param data_here: the data (as a vector)
     :param labels_here: a vector indicating the group for each data point
     :param unique_labels_here: the group labels (there must be two of them)
@@ -90,10 +94,12 @@ def clust_stats_opencv(stat, pval, threshold=0.05, cyclic=False):
     """
     Finds connected clusters using the algorithm for opencv (works for two dimensional cases) and computes the
     Maris and Oostenveld cluster statistics
+
     :param stat: the t-statistics per data point
     :param pval: the pvalue per data point
     :param threshold: the site-based threshold
     :param cyclic: if True, the array is considered cyclic (not implemented yet)
+
     :return: cluster_stats: the cluster statistics, clusters: the clusters
     """
     active_sites = (pval < threshold).astype(np.int8)
@@ -127,10 +133,12 @@ def clust_stats_1d(stat, pval, threshold=0.05, cyclic=False):
     """
     Finds connected clusters for the 1D case and computes the
     Maris and Oostenveld cluster statistics
+
     :param stat: the t-statistics per data point
     :param pval: the pvalue per data point
     :param threshold: the site-based threshold
     :param cyclic: if True, the array is considered cyclic (not implemented yet)
+
     :return: cluster_stats: the cluster statistics, clusters: the clusters (as slices)
     """
     active_sites = (pval < threshold).astype(np.int)
@@ -160,14 +168,16 @@ def cluster_statistic(data_here: np.numarray, labels_here: np.numarray, unique_l
                       site_statistics=site_statistics_ttest_ind, bins_here=None):
     """
     computes the Maris and Oostenveld cluster statistics
+
     :param data_here: the data
     :param labels_here: a vector with labels
     :param unique_labels_here: the unique labels (there must be two of them)
     :param connectivity: can be '1d', '1dcyclic' (for example for polar variables) or '2d' (e.g. spectrograms)
     :param site_alpha: threshold site based, (default 0.05)
     :param site_statistics: the function to be used for the site statistics (default, independent t-test)
-    :param bins_here: a vector with the bins data point belong to, in the case that all data are in one vector (e.g.
-    for irregular designs
+    :param bins_here: a vector with the bins data point belong to, in the case that all data are in one vector
+           (e.g. for irregular designs
+
     :return: cluster_stats: the cluster statistics, clusters: the clusters (as slices)
     """
     stat, pval = site_statistics(data_here, labels_here, unique_labels_here, bins_here)
@@ -215,6 +225,7 @@ def monte_carlo_iteration(connectivity='1d', site_alpha=0.05,
 def run_monte_carlo(df, col_groups, col_values, n_repetitions, connectivity='1d', site_alpha=0.05,
                     site_statistics=site_statistics_ttest_ind, parallel=True, col_bins=None):
     """
+    Runs a monte-carlo to compute the boostrap distribution of the M & O cluster statistics
 
     :param df: dataframe with the data
     :param col_groups: the column with the group labels
@@ -224,8 +235,9 @@ def run_monte_carlo(df, col_groups, col_values, n_repetitions, connectivity='1d'
     :param site_alpha: threshold site based, (default 0.05)
     :param site_statistics: the function to be used for the site statistics (default, independent t-test)
     :param parallel: if True, uses concurrent.futures to parallelize monte-carlo execution
-    :param col_bins: the column with the bins data point belong to, in the case that all data are in one vector (e.g.
-    for irregular designs, default is None for (Ndata X Ncolumns) design
+    :param col_bins: the column with the bins data point belong to, in the case that all data are in one vector
+           (e.g. for irregular designs, default is None for (Ndata X Ncolumns) design
+
     :return: stats_mc, a sorted series with the statistics value for the monte-carlo trials
     """
     global data
@@ -262,6 +274,7 @@ def run_monte_carlo(df, col_groups, col_values, n_repetitions, connectivity='1d'
 def cluster_stats_pvalue(df, col_groups, col_values, n_repetitions, connectivity='1d', site_alpha=0.05,
                          site_statistics=site_statistics_ttest_ind, parallel=True, col_bins=None, two_sided=False):
     """
+    Computes M & O statistics and its p-value
 
     :param df: dataframe with the data
     :param col_groups: the column with the group labels
@@ -271,11 +284,13 @@ def cluster_stats_pvalue(df, col_groups, col_values, n_repetitions, connectivity
     :param site_alpha: threshold site based, (default 0.05)
     :param site_statistics: the function to be used for the site statistics (default, independent t-test)
     :param parallel: if True, uses concurrent.futures to parallelize monte-carlo execution
-    :param col_bins: the column with the bins data point belong to, in the case that all data are in one vector (e.g.
-    for irregular designs, default is None for (Ndata X Ncolumns) design
+    :param col_bins: the column with the bins data point belong to, in the case that all data are in one vector
+           (e.g. for irregular designs, default is None for (Ndata X Ncolumns) design
     :param two_sided: if True the test is taken to be two sided
-    :return: clusters_obs: the observed clusters, cluster_stats_obs: the cluster statistics,
-    cluster_pval_obs: the cluster p-value
+
+    :return: clusters_obs: the observed clusters, cluster_stats_obs: the cluster statistics, cluster_pval_obs:
+             the cluster p-value
+
     """
     data_here = df[col_values].values
     labels_here = df[col_groups].values
