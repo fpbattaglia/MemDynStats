@@ -116,3 +116,5 @@ venv.bak/
 /jupyter/Untitled.ipynb
 /jupyter/*.csv
 /docs/build/
+
+/scripts/*.csv
