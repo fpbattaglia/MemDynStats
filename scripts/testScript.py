@@ -6,6 +6,8 @@ from matplotlib.pyplot import cm
 import matplotlib.patches as patch
 import ClusterStats.cluster_stats as cs
 
+import timeit
+
 print("Let's get this party started")
 
 def processStats(df,cl,stats,pval):
@@ -28,19 +30,26 @@ def processStats(df,cl,stats,pval):
 print("Reading in data")
 df = pd.read_csv('downPeakAmpsAndDur.csv')
 
-eNpHR3_90 = df[(df.virus == 'eNpHR3') & (df.stim_dur == 90)]
+eNpHR3_90 = df[(df.virus == 'eNpHR3') & (df.stim_dur == 90)].copy()
 n_bins = 20
-eNpHR3_90['phase_bin'] = 0
-eNpHR3_90['phase_bin'] = (eNpHR3_90.loc[:, 'stim_phase'] // (360/20)).copy().astype(np.int)
+eNpHR3_90.loc[:, 'phase_bin'] = 0
+eNpHR3_90.loc[:, 'phase_bin'] = (eNpHR3_90.loc[:, 'stim_phase'] // (360/20)).copy().astype(np.int)
 eNpHR3_90_nanfree = eNpHR3_90.loc[eNpHR3_90['30_width'].dropna().index,:]
 
 print("Now attempting the big stuff")
+
+start = timeit.default_timer()
 cl_eNpHR3_90_dur, stats_eNpHR3_90_dur, cl_pval_eNpHR3_90_dur = cs.cluster_stats_pvalue(eNpHR3_90_nanfree, 'stim_on', '30_width', 
-                                             n_repetitions=1000, 
+                                             n_repetitions=10000,
                                              site_statistics=cs.site_statistics_ttest_ind_multi_group, 
                                              connectivity='1dcyclic',
                                              col_bins='phase_bin', two_sided=True
                                             )
+end = timeit.default_timer()
+
+elapsed_time = end-start
+print("It took ", elapsed_time, " seconds")
+
 print("Processing stats")
 signifAmps_90, signif_all_90 = processStats(eNpHR3_90_nanfree,cl_eNpHR3_90_dur,stats_eNpHR3_90_dur,cl_pval_eNpHR3_90_dur)
 
