@@ -43,7 +43,7 @@ cl_eNpHR3_90_dur, stats_eNpHR3_90_dur, cl_pval_eNpHR3_90_dur = cs.cluster_stats_
                                              n_repetitions=10000,
                                              site_statistics=cs.site_statistics_ttest_ind_multi_group, 
                                              connectivity='1dcyclic',
-                                             col_bins='phase_bin', two_sided=True
+                                             col_bins='phase_bin', two_sided=True, parallel=True
                                             )
 end = timeit.default_timer()
 
