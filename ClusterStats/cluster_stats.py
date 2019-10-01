@@ -195,7 +195,7 @@ def cluster_statistic(data_here: np.numarray, labels_here: np.numarray, unique_l
 
 
 def get_random_seed():
-    rf = open('/dev/random', 'rb')
+    rf = open('/dev/urandom', 'rb')
     seed = int.from_bytes(rf.read(4), 'big')
     return seed
 
@@ -260,6 +260,7 @@ def run_monte_carlo(df, col_groups, col_values, n_repetitions, connectivity='1d'
                                                                                    site_alpha, site_statistics)],
                                     chunksize=1250)
     else:
+        print("Using single processor")
         stats_mc = map(monte_carlo_iteration,
                        *[itertools.repeat(d, n_repetitions) for d in (connectivity,
                                                                       site_alpha, site_statistics)])
