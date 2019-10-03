@@ -1,5 +1,6 @@
 import concurrent.futures
 import itertools
+import warnings
 
 import cv2
 import numpy as np
@@ -17,14 +18,24 @@ def calc_mean_var_2groups(a, b):
     :param b: a first group ( (Ndata,) or (Ndata, N_columns)
     :return: m1, m2, s1, s2 (the means and standard deviations)
     """
-    m1 = np.sum(a, axis=0) / a.shape[0]
-    m2 = np.sum(b, axis=0) / b.shape[0]
-    a1 = a - m1
-    am = np.sum(a1 * a1, axis=0) / (a.shape[0] - 1)
-    s1 = np.sqrt(am)
-    b1 = b - m2
-    bm = np.sum(b1 * b1, axis=0) / (b.shape[0] - 1)
-    s2 = np.sqrt(bm)
+    if len(a) <= 1:
+        m1 = np.nan
+        s1 = np.nan
+    else:
+        m1 = np.sum(a, axis=0) / a.shape[0]
+        a1 = a - m1
+        am = np.sum(a1 * a1, axis=0) / (a.shape[0] - 1)
+        s1 = np.sqrt(am)
+
+    if len(b) <= 1:
+        m2 = np.nan
+        s2 = np.nan
+    else:
+        m2 = np.sum(b, axis=0) / b.shape[0]
+        b1 = b - m2
+        bm = np.sum(b1 * b1, axis=0) / (b.shape[0] - 1)
+        s2 = np.sqrt(bm)
+
     return m1, m2, s1, s2
 
 
@@ -181,6 +192,8 @@ def cluster_statistic(data_here: np.numarray, labels_here: np.numarray, unique_l
     :return: cluster_stats: the cluster statistics, clusters: the clusters (as slices)
     """
     stat, pval = site_statistics(data_here, labels_here, unique_labels_here, bins_here)
+    if np.any(np.isnan(stat)):
+        warnings.warn("some bins have too few data points")
 
     if connectivity == '1d':
         cluster_stats, clusters = clust_stats_1d(stat, pval, site_alpha)
